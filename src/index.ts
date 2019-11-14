@@ -44,14 +44,26 @@ export type Any = Decoder<unknown>;
 
 // Constructors
 
+export const any = Decoder({
+    parse(input : unknown) {
+        return success(input);
+    },
+});
+
+export const never = Decoder({
+    parse(input : unknown) {
+        return fail(`Unexpected`);
+    },
+});
+
 export const unit : Decoder<null> = Decoder({
     parse(input : unknown) {
         if (input !== null) { return fail($msg`Expected null, given ${input}`); }
         return success(input as null);
     },
 });
-
-export const string : Decoder<string> & (<S extends string>(value: S) => Decoder<S>) = Object.assign(
+2
+export const string : Decoder<string> & (<S extends string>(value : S) => Decoder<S>) = Object.assign(
     <S extends string>(value : S) : Decoder<S> => Decoder({
         parse(input : unknown) {
             if (typeof input !== 'string') { return fail($msg`Expected a string, given ${input}`); }
@@ -66,7 +78,7 @@ export const string : Decoder<string> & (<S extends string>(value: S) => Decoder
     })
 );
 
-export const number : Decoder<number> & (<N extends number>(value: N) => Decoder<N>) = Object.assign(
+export const number : Decoder<number> & (<N extends number>(value : N) => Decoder<N>) = Object.assign(
     <N extends number>(value : N) : Decoder<N> => Decoder({
         parse(input : unknown) {
             if (typeof input !== 'number') { return fail($msg`Expected a number, given ${input}`); }
@@ -102,7 +114,9 @@ export const record = <P extends { [key : string] : Any }>(props : P)
         parse(input : unknown, context : DecodingContext) {
             type Result = { [key in keyof P] : DecoderType<P[key]> };
             
-            if (typeof input !== 'object' || input === null) { return fail($msg`Expected an object, given ${input}`); }
+            if (typeof input !== 'object' || input === null) {
+                return fail($msg`Expected an object, given ${input}`);
+            }
             
             const instance = {} as Result;
             let errors : string[] = [];
@@ -144,9 +158,9 @@ export const dict = <E extends Any>(entry : E)
             type Result = { [key : string] : E };
             
             if (!ObjectUtil.isObject(input)) { return fail($msg`Expected an object, given ${input}`); }
-
+            
             const entrySchema = entry;
-
+            
             const instance : Result = {};
             let errors : string[] = [];
             for (const key in input) {
@@ -182,7 +196,7 @@ type DecoderFromDefinition<D> =
     : D extends string ? Decoder<D>
     : D extends number ? Decoder<D>
     : D extends { [key : string] : Definition }
-        ? Decoder<{ [key in keyof D] : DecoderFrom<D[key]> extends Decoder<infer A> ? A : never }>
+    ? Decoder<{ [key in keyof D] : DecoderFromDefinition<D[key]> extends Decoder<infer A> ? A : never }>
     : never;
 
 export const schema = <D extends Definition>(definition : D) : DecoderFromDefinition<D> => {
