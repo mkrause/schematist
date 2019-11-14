@@ -62,7 +62,7 @@ export const unit : Decoder<null> = Decoder({
         return success(input as null);
     },
 });
-2
+
 export const string : Decoder<string> & (<S extends string>(value : S) => Decoder<S>) = Object.assign(
     <S extends string>(value : S) : Decoder<S> => Decoder({
         parse(input : unknown) {
@@ -181,13 +181,15 @@ export const dict = <E extends Any>(entry : E)
         },
     });
 
+
 // Utility to create codecs
+
 export type Definition =
     Decoder<unknown>
-    | null 
-    | string 
-    | number 
-    //| bigint 
+    | null
+    | string
+    | number
+    //| bigint
     | { [key : string] : Definition };
 
 type DecoderFromDefinition<D> =
@@ -214,4 +216,4 @@ export const schema = <D extends Definition>(definition : D) : DecoderFromDefini
     }
 };
 
-const App = schema({ name: { z: string, x: 42 as const } });
+//const App = schema({ name: { z: string, x: 42 as const } });
