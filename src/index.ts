@@ -56,12 +56,45 @@ export const never = Decoder({
     },
 });
 
+export const undefinedC : Decoder<undefined> = Decoder({
+    parse(input : unknown) {
+        if (typeof input !== 'undefined') { return fail($msg`Expected undefined, given ${input}`); }
+        return success(input as undefined);
+    },
+});
+
 export const unit : Decoder<null> = Decoder({
     parse(input : unknown) {
         if (input !== null) { return fail($msg`Expected null, given ${input}`); }
         return success(input as null);
     },
 });
+
+export const union = <S extends [Any, Any, ...Array<Any>]>(alts : S)
+    : Decoder<S[number]> =>
+    Decoder({
+        parse(input : unknown, context : DecodingContext) {
+            type Result = S[number];
+            
+            let isSuccess = false;
+            for (const alt of alts) {
+                const result = alt.decode(input);
+                
+                if (Either.isRight(result)) {
+                    isSuccess = true;
+                }
+            }
+            
+            if (!isSuccess) {
+                return fail(`Expected one of [TODO], given ${input}`);
+            }
+            
+            return success(input as Result);
+        },
+    });
+
+export const optional = x => union([undefinedC, x]);
+export const maybe = x => union([unit, x]);
 
 export const string : Decoder<string> & (<S extends string>(value : S) => Decoder<S>) = Object.assign(
     <S extends string>(value : S) : Decoder<S> => Decoder({
@@ -93,6 +126,16 @@ export const number : Decoder<number> & (<N extends number>(value : N) => Decode
     })
 );
 
+/*
+export const option = <S extends { [key : string] : Any }>(alts : S)
+    : Decoder<S[TODO]> =>
+    Decoder({
+        parse(input : unknown, context : DecodingContext) {
+            return success(input as Result);
+        },
+    });
+*/
+
 export const Dict : Decoder<{ [key : string] : unknown }> = Decoder({
     parse(input, context) {
         if (typeof input !== 'object' || input === null) { return fail(`Expected an object`); }
@@ -121,16 +164,20 @@ export const record = <P extends { [key : string] : Any }>(props : P)
             const instance = {} as Result;
             let errors : string[] = [];
             for (const key in props) {
-                if (!ObjectUtil.hasOwnProp(input, key)) {
-                    errors.push(`Missing property: ${key}`);
-                    continue;
-                }
+                // if (!ObjectUtil.hasOwnProp(input, key)) {
+                //     errors.push(`Missing property: ${key}`);
+                //     continue;
+                // }
                 
                 const propSchema = props[key];
-                const propInstance = input[key];
+                const propInstance = ObjectUtil.hasOwnProp(input, key) ? input[key] : undefined;
                 const propResult = propSchema.parse(propInstance, {});
                 if (Either.isLeft(propResult)) {
-                    errors.push(`Invalid property '${key}': ${propResult.left}`);
+                    if (!ObjectUtil.hasOwnProp(input, key)) {
+                        errors.push(`Missing property: ${key}`);
+                    } else {
+                        errors.push(`Invalid property '${key}': ${propResult.left}`);
+                    }
                 } else {
                     instance[key] = propResult.right as DecoderType<typeof propSchema>;
                 }
