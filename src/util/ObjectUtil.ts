@@ -1,12 +1,17 @@
 
+export const hasProp = <K extends PropertyKey>(obj : object, key : K) : obj is { [key in K] : unknown } =>
+    key in obj;
+
 export const hasOwnProp = <K extends PropertyKey>(obj : object, key : K) : obj is { [key in K] : unknown } =>
     Object.prototype.hasOwnProperty.call(obj, key);
 
+export const isObjectLike = (obj : unknown) : obj is object =>
+    typeof obj !== 'undefined' && obj !== null;
+
 export const isObject = (obj : unknown) : obj is { [key in PropertyKey] : unknown } =>
-    typeof obj === 'object' && obj !== null;
+    obj !== null && (typeof obj === 'object' || typeof obj === 'function');
 
-
-export const isPlainObject = (obj : unknown) => {
+export const isPlainObject = (obj : unknown) : obj is { [key in PropertyKey] : unknown } => {
     if (typeof obj !== 'object' || obj === null) {
         return false;
     }

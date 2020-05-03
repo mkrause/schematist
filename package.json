@@ -10,7 +10,7 @@
         "src/",
         "lib-cjs/",
         "lib-esm/",
-        "typings/index.d.ts"
+        "typings/schematist.d.ts"
     ],
     "typings": "./typings/index.d.ts",
     "engines": {
