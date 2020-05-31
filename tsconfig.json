@@ -1,14 +1,18 @@
 {
     "exclude": [
         "node_modules",
+        "**/*.spec.ts",
     ],
     "include": [
         "src/**/*",
     ],
     "compilerOptions": {
         "noEmit": true,
-        "lib": ["es2019"],
+        "noErrorTruncation": true,
+        "esModuleInterop": true,
+        "lib": ["es2020"],
         "allowJs": false,
         "strict": true,
+        "noImplicitThis": true,
     },
 }

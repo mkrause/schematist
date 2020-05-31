@@ -21,6 +21,10 @@ export const isPlainObject = (obj : unknown) : obj is { [key in PropertyKey] : u
 };
 
 
+// https://github.com/Microsoft/TypeScript/pull/12253#issuecomment-393954723
+export const keys = Object.keys as <T>(o: T) => (Extract<keyof T, string>)[];
+
+
 export const map = <O extends {}, Result>(obj : O, fn : (value : O[keyof O], key : keyof O) => Result)
     : { [key in keyof O] : Result } => {
         const result : { [key : string] : Result } = {};
