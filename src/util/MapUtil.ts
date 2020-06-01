@@ -51,4 +51,10 @@ export const toArray = <K, V>(map : Map<K, V>) => {
 };
 
 
-//export const upsert = () => ... // TODO
+export const upsert = <K, V>(map : Map<K, Array<V>>, key : K, value : V) => {
+    if (map.has(key)) {
+        map.set(key, [...map.get(key)!, value]);
+    } else {
+        map.set(key, [value]);
+    }
+};
