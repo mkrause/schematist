@@ -1,10 +1,8 @@
 
+import type { LocationKey, Location } from '../modules/Traversing.js';
+
 import type { DecodeError, DecodeReport } from '../modules/Decoding.js';
 import * as D from '../modules/Decoding.js';
-
-
-type LocationKey = unknown;
-type Location = Array<LocationKey>;
 
 
 type DecodeErrorWithLocation = { location : Location, reason : DecodeError };

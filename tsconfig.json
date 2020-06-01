@@ -1,7 +1,12 @@
 {
     "exclude": [
-        "node_modules",
+        //"node_modules",
         "**/*.spec.ts",
+        
+        // TEMP
+        "./src/schematist.ts",
+        "./src/index.ts",
+        "./src/modules_old/**",
     ],
     "include": [
         "src/**/*",
@@ -14,5 +19,9 @@
         "allowJs": false,
         "strict": true,
         "noImplicitThis": true,
+        
+        // Note: we don't use TypeScript emit, but we still need to set the target to enable certain language features
+        "target": "ES2020",
+        "moduleResolution": "node",
     },
 }
