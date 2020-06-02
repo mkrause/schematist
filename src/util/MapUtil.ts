@@ -50,6 +50,15 @@ export const toArray = <K, V>(map : Map<K, V>) => {
     );
 };
 
+export const map = <K, V, W>(map : Map<K, V>, fn : (value : V, key : K) => W) : Map<K, W> => {
+    const result = new Map<K, W>();
+    
+    map.forEach((value, key) => {
+        result.set(key, fn(value, key));
+    });
+    
+    return result;
+};
 
 export const upsert = <K, V>(map : Map<K, Array<V>>, key : K, value : V) => {
     if (map.has(key)) {

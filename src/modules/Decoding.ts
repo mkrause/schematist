@@ -124,13 +124,13 @@ export const literal = <L>(literal : L) : Decoder<L> => ({
 //
 
 type UnionMeta<S extends NonEmptyArray<Unknown>> = {
-    decode : Decoder<S[number]>['decode'] & Traversable & {
+    decode : Decoder<TypeOf<S[number]>>['decode'] & Traversable & {
         tag : typeof union,
     },
 };
-export const union = <S extends NonEmptyArray<Unknown>>(alts : S) : Decoder<S[number]> & UnionMeta<S> => {
+export const union = <S extends NonEmptyArray<Unknown>>(alts : S) : Decoder<TypeOf<S[number]>> & UnionMeta<S> => {
     const decode = (input : unknown) => {
-        type Instance = S[number]; // `S[number]` is the union of all elements (types) of the array `S`
+        type Instance = TypeOf<S[number]>; // `S[number]` is the union of all elements (types) of the array `S`
         
         let hasValid = false;
         let instance = null as unknown as Instance;
@@ -153,7 +153,8 @@ export const union = <S extends NonEmptyArray<Unknown>>(alts : S) : Decoder<S[nu
             // return fail({ type: 'none-valid', report });
             
             // report.set(selfReport, { given: input, report: { type: 'none-valid' } });
-            return fail(report);
+            // return fail(report);
+            return fail({ type: 'none-valid', reasons: report });
         }
         
         return success(instance);
@@ -192,10 +193,10 @@ export const record = <P extends RecordOf<Unknown>>(props : P) : Decoder<MapType
         // Check whether the input is a plain object (reason: we construct a new object for the result,
         // so we would not want to "lose" the prototype)
         // XXX this fails across different contexts with different `Object` instances (e.g. frames or Node custom REPL)
-        // const proto = Object.getPrototypeOf(input);
-        // if (!(proto === null || proto === Object.prototype)) {
-        //     return fail({ type: 'unexpected-prototype', given: proto });
-        // }
+        const proto = Object.getPrototypeOf(input);
+        if (!(proto === null || proto === Object.prototype)) {
+            return fail({ type: 'unexpected-prototype' });
+        }
         
         const report : DecodeReportChildren = new Map();
         
@@ -210,7 +211,11 @@ export const record = <P extends RecordOf<Unknown>>(props : P) : Decoder<MapType
             const keysUnknown = inputKeys.filter(key => !propsKeys.includes(key));
             
             for (const key of keysMissing) {
-                report.set(key, { report: { type: 'prop-missing' } });
+                // Attempt to decode as undefined (if that succeeds, accept the property)
+                const result = props[key].decode(undefined);
+                if (Either.isLeft(result)) {
+                    report.set(key, { report: { type: 'prop-missing' } });
+                }
             }
             for (const key of keysUnknown) {
                 report.set(key, { report: { type: 'prop-unknown' } });
@@ -218,7 +223,7 @@ export const record = <P extends RecordOf<Unknown>>(props : P) : Decoder<MapType
         }
         
         // Construct result object (respecting prototype and symbols)
-        const proto = Object.getPrototypeOf(input);
+        //const proto = Object.getPrototypeOf(input);
         const instance = (proto === null ? Object.create(null) : {}) as Instance;
         
         for (const symbolKey of Object.getOwnPropertySymbols(input)) {
@@ -257,6 +262,25 @@ export const record = <P extends RecordOf<Unknown>>(props : P) : Decoder<MapType
             children: MapUtil.fromObject(props) as Map<LocationKey, Decoder<unknown>>,
         }),
     };
+};
+
+export const partial = <P extends RecordOf<Unknown>>(recordTarget : Decoder<MapTypeOf<P>> & RecordMeta<P>) => {
+    const props = MapUtil.toObject(recordTarget.decode.children) as P;
+    const propsPartial = ObjectUtil.map(props, (prop : Decoder<unknown>) => optional(prop)) as unknown as RecordOf<Unknown>;
+    return record(propsPartial);
+    
+    /*
+    const decode = (input : unknown) => {
+        
+    };
+    
+    return {
+        decode: Object.assign(decode, {
+            tag: record,
+            children: MapUtil.map(record.decode.children, prop => optional(prop)),
+        }),
+    };
+    */
 };
 
 
@@ -309,15 +333,49 @@ export const dict = <E extends Unknown>(entry : E) : Decoder<RecordOf<E>> & Dict
         decode: Object.assign(decode, {
             tag: dict,
             children: new Map<LocationKey, Unknown>([
-                [':key', string],
+                //[':key', string],
                 [':entry', entry],
             ]),
         }),
     };
 };
 
-// export const variant = <P extends RecordOf<Unknown>>(alts : P) : Decoder<MapTypeOf<P>> => ({
-//     decode: (input : unknown) : input is MapTypeOf<P> => {
-//         // TODO
-//     },
-// });
+type VariantMeta<S extends RecordOf<Unknown>> = {
+    decode : Decoder<MapTypeOf<S>[string]>['decode'] & Traversable & {
+        tag : typeof variant,
+    },
+};
+export const variant = <S extends RecordOf<Unknown>>(alts : S) : Decoder<MapTypeOf<S>[string]> & VariantMeta<S> => {
+    const decode = (input : unknown) => {
+        type Instance = MapTypeOf<S>[string];
+        
+        let hasValid = false;
+        let instance = null as unknown as Instance;
+        const report : DecodeReportChildren = new Map();
+        for (const altKey in alts) {
+            const alt = alts[altKey];
+            const result = alt.decode(input);
+            
+            if (Either.isRight(result)) {
+                hasValid = true;
+                instance = { [altKey]: result.right } as Instance;
+                break;
+            }
+            
+            report.set(altKey, { report: result.left });
+        }
+        
+        if (!hasValid) {
+            return fail({ type: 'none-valid', reasons: report });
+        }
+        
+        return success(instance);
+    };
+    
+    return {
+        decode: Object.assign(decode, {
+            tag: variant,
+            children: MapUtil.fromObject(alts) as Map<LocationKey, Decoder<unknown>>,
+        }),
+    };
+};

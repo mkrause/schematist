@@ -5,6 +5,7 @@ import type { DecodeError, DecodeReport } from '../modules/Decoding.js';
 import * as D from '../modules/Decoding.js';
 
 
+/*
 type DecodeErrorWithLocation = { location : Location, reason : DecodeError };
 
 const FlattenReporter = (report : DecodeReport) : Array<DecodeErrorWithLocation> => {
@@ -35,5 +36,37 @@ const FlattenReporter = (report : DecodeReport) : Array<DecodeErrorWithLocation>
     
     return errors;
 };
+*/
 
-export default FlattenReporter;
+const flatten = (report : DecodeReport) : Map<Location, Array<DecodeError>> => {
+    if (!(report instanceof Map)) {
+        const errors = Array.isArray(report) ? report : [report];
+        return new Map([
+            [[], errors],
+        ]);
+    }
+    
+    const reportFlattened = new Map<Location, Array<DecodeError>>();
+    
+    report.forEach(({ given, report: childReport }, key) => {
+        // const childReports = report.flatMap(FlattenReporter)
+        //     .map(report => ({ ...report, location: [key, ...report.location] }));
+        
+        const childReports = flatten(childReport);
+        
+        // TODO: use MapUtil.map/flatMap
+        const childReportsWithKey = new Map<Location, Array<DecodeError>>(
+            [...childReports.entries()].map(([location, errors]) => {
+                return [[key, ...location], errors];
+            })
+        );
+        
+        childReportsWithKey.forEach((errors, location) => {
+            reportFlattened.set(location, errors);
+        });
+    });
+    
+    return reportFlattened;
+};
+
+export default flatten;
