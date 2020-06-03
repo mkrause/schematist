@@ -14,10 +14,11 @@ import type { LocationKey, Location } from '../modules/Traversing.js';
 const selfReport = Symbol('self');
 
 export type DecodeError = { type : string };
-export type DecodeReportChildren = Map<LocationKey | typeof selfReport, { given ?: unknown, report : DecodeReport }>;
+export type DecodeReportChild = { given ?: unknown, report : DecodeReport };
+export type DecodeReportChildren = Map<LocationKey | typeof selfReport, DecodeReportChild>;
 export type DecodeReport =
     | DecodeError
-    | Array<DecodeError>
+    //| Array<DecodeError> // Note: if we need multiple errors, can just introduce a `type: '@multiple'` or something
     | DecodeReportChildren;
     // | Array<{ key : LocationKey, reason : DecodeReport }>;
 
@@ -124,7 +125,7 @@ export type Union<S extends NonEmptyArray<Unknown>> = Decoder<TypeOf<S[number]>>
     tag : typeof union,
 };
 export const unionErrors = {
-    noneValid: (tried : DecodeReportChildren) => ({ type: 'none-valid', tried }),
+    noneValid: (attempts : DecodeReportChildren) => ({ type: 'none-valid', attempts }),
 };
 export const union = <S extends NonEmptyArray<Unknown>>(alts : S) : Union<S> => {
     type Instance = TypeOf<S[number]>; // `S[number]` is the union of all elements (types) of the array `S`
@@ -155,7 +156,7 @@ export const union = <S extends NonEmptyArray<Unknown>>(alts : S) : Union<S> => 
     
     return {
         tag: union,
-        children: MapUtil.fromArray(alts) as Map<LocationKey, Decoder<unknown>>,
+        get children() { return MapUtil.fromArray(alts) as Map<LocationKey, Decoder<unknown>>; },
         decode,
     };
 };
@@ -251,7 +252,7 @@ export const record = <P extends DictOf<Unknown>>(props : P) : Record<P> => {
     return {
         tag: record,
         props,
-        children: MapUtil.fromObject(props) as Map<LocationKey, Decoder<P[string]>>,
+        get children() { return MapUtil.fromObject(props) as Map<LocationKey, Decoder<P[string]>>; },
         decode,
     };
 };
@@ -321,9 +322,11 @@ export const dict = <E extends Unknown>(entry : E) : Dict<E> => {
     return {
         tag: dict,
         entry,
-        children: new Map<LocationKey, E>([
-            [dictEntry, entry],
-        ]),
+        get children() {
+            return new Map<LocationKey, E>([
+                [dictEntry, entry],
+            ]);
+        },
         
         decode,
     };
@@ -333,7 +336,7 @@ export type Variant<S extends DictOf<Unknown>> = Decoder<TypeOfDict<S>[string]> 
     tag : typeof variant,
 };
 export const variantErrors = {
-    noneValid: (tried : DecodeReportChildren) => ({ type: 'none-valid', tried }),
+    noneValid: (attempts : DecodeReportChildren) => ({ type: 'none-valid', attempts }),
 };
 export const variant = <S extends DictOf<Unknown>>(alts : S) : Variant<S> => {
     type Instance = TypeOfDict<S>[string];
@@ -364,7 +367,7 @@ export const variant = <S extends DictOf<Unknown>>(alts : S) : Variant<S> => {
     
     return {
         tag: variant,
-        children: MapUtil.fromObject(alts) as Map<LocationKey, S[string]>,
+        get children() { return MapUtil.fromObject(alts) as Map<LocationKey, S[string]>; },
         
         decode,
     };

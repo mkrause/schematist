@@ -1,7 +1,7 @@
 
 import type { LocationKey, Location } from '../modules/Traversing.js';
 
-import type { DecodeError, DecodeReport } from '../modules/Decoding.js';
+import type { DecodeError, DecodeReportChild, DecodeReportChildren, DecodeReport } from '../modules/Decoding.js';
 import * as D from '../modules/Decoding.js';
 
 
@@ -38,32 +38,35 @@ const FlattenReporter = (report : DecodeReport) : Array<DecodeErrorWithLocation>
 };
 */
 
-const flatten = (report : DecodeReport) : Map<Location, Array<DecodeError>> => {
+export type FlattenedReportChild = { given ?: unknown, report : FlattenedReport };
+export type FlattenedReportChildren = Map<Location, FlattenedReportChild>;
+export type FlattenedReport =
+    | DecodeError
+    | FlattenedReportChildren;
+
+const flatten = (report : DecodeReport) : FlattenedReport => {
     if (!(report instanceof Map)) {
-        const errors = Array.isArray(report) ? report : [report];
-        return new Map([
-            [[], errors],
-        ]);
+        return report;
     }
     
-    const reportFlattened = new Map<Location, Array<DecodeError>>();
+    const reportFlattened : FlattenedReport = new Map();
     
     report.forEach(({ given, report: childReport }, key) => {
-        // const childReports = report.flatMap(FlattenReporter)
-        //     .map(report => ({ ...report, location: [key, ...report.location] }));
+        const childReportFlattened = flatten(childReport);
         
-        const childReports = flatten(childReport);
-        
-        // TODO: use MapUtil.map/flatMap
-        const childReportsWithKey = new Map<Location, Array<DecodeError>>(
-            [...childReports.entries()].map(([location, errors]) => {
-                return [[key, ...location], errors];
-            })
-        );
-        
-        childReportsWithKey.forEach((errors, location) => {
-            reportFlattened.set(location, errors);
-        });
+        if (!(childReportFlattened instanceof Map)) {
+            reportFlattened.set([key], { report: childReportFlattened });
+            return;
+        } else {
+            // TODO: introduce something like MapUtil.map/flatMap
+            const childReportsWithKey = new Map<Location, FlattenedReport>(
+            );
+            [...childReportFlattened.entries()].forEach(([locationChild, entry]) => {
+                const location = [key, ...locationChild];
+                
+                reportFlattened.set(location, entry);
+            });
+        }
     });
     
     return reportFlattened;
