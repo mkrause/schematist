@@ -46,16 +46,16 @@ export type TypeOf<D extends Decoder<unknown>> = D extends Decoder<infer A> ? A 
 //
 
 export type Tagged<T> = { tag : T };
-export const isTagged = <T>(input : unknown) : input is Tagged<T> => {
-    return typeof input === 'object' && input !== null && ObjectUtil.hasOwnProp(input, 'tag');
+export const isTagged = <T>(tag : T, input : unknown) : input is Tagged<T> => {
+    return typeof input === 'object' && input !== null && ObjectUtil.hasOwnProp(input, 'tag') && input.tag === tag;
 };
 
 type NonEmptyArray<T> = [T, ...Array<T>];
 type Traversable = { children : Map<LocationKey, Decoder<unknown>> };
 
 type Unknown = Decoder<unknown>;
-type RecordOf<T> = { [key : string] : T };
-type MapTypeOf<T extends { [key : string] : Decoder<unknown> }> = { [key in keyof T] : TypeOf<T[key]> };
+type DictOf<T> = { [key : string] : T };
+type TypeOfDict<T extends { [key : string] : Decoder<unknown> }> = { [key in keyof T] : TypeOf<T[key]> };
 
 
 //
@@ -123,13 +123,12 @@ export const literal = <L>(lit : L) : Literal<L> => ({
 export type Union<S extends NonEmptyArray<Unknown>> = Decoder<TypeOf<S[number]>> & Traversable & {
     tag : typeof union,
 };
-const unionErrors = {
-    noneValid: (reasons : DecodeReportChildren) => ({ type: 'none-valid', reasons }),
+export const unionErrors = {
+    noneValid: (tried : DecodeReportChildren) => ({ type: 'none-valid', tried }),
 };
 export const union = <S extends NonEmptyArray<Unknown>>(alts : S) : Union<S> => {
+    type Instance = TypeOf<S[number]>; // `S[number]` is the union of all elements (types) of the array `S`
     const decode = (input : unknown) => {
-        type Instance = TypeOf<S[number]>; // `S[number]` is the union of all elements (types) of the array `S`
-        
         let hasValid = false;
         let instance = null as unknown as Instance;
         const report : DecodeReportChildren = new Map();
@@ -148,10 +147,6 @@ export const union = <S extends NonEmptyArray<Unknown>>(alts : S) : Union<S> => 
         }
         
         if (!hasValid) {
-            // return fail({ type: 'none-valid', report });
-            
-            // report.set(selfReport, { given: input, report: { type: 'none-valid' } });
-            // return fail(report);
             return fail(unionErrors.noneValid(report));
         }
         
@@ -174,15 +169,15 @@ export const maybe = <A>(d : Decoder<A>) => union([d, unit]);
 // Complex constructors
 //
 
-type RecordMeta<P extends RecordOf<Unknown>> = {
-    decode : Decoder<MapTypeOf<P>>['decode'] & Traversable & {
-        tag : typeof record,
-    },
+export type Record<P extends DictOf<Unknown>> = Decoder<TypeOfDict<P>> & Traversable & {
+    props : P,
+    tag : typeof record,
 };
-export const record = <P extends RecordOf<Unknown>>(props : P) : Decoder<MapTypeOf<P>> & RecordMeta<P> => {
+export const recordErrors = {};
+export const record = <P extends DictOf<Unknown>>(props : P) : Record<P> => {
+    type Instance = TypeOfDict<P>;
+    
     const decode = (input : unknown) => {
-        type Instance = MapTypeOf<P>;
-        
         if (typeof input !== 'object' || input === null) {
             return fail(unexpectedTypeError());
         }
@@ -254,42 +249,39 @@ export const record = <P extends RecordOf<Unknown>>(props : P) : Decoder<MapType
     };
     
     return {
-        decode: Object.assign(decode, {
-            tag: record,
-            children: MapUtil.fromObject(props) as Map<LocationKey, Decoder<unknown>>,
-        }),
+        tag: record,
+        props,
+        children: MapUtil.fromObject(props) as Map<LocationKey, Decoder<P[string]>>,
+        decode,
     };
 };
 
-export const partial = <P extends RecordOf<Unknown>>(recordTarget : Decoder<MapTypeOf<P>> & RecordMeta<P>) => {
-    const props = MapUtil.toObject(recordTarget.decode.children) as P;
-    const propsPartial = ObjectUtil.map(props, (prop : Decoder<unknown>) => optional(prop)) as unknown as RecordOf<Unknown>;
+export const partial = <P extends DictOf<Unknown>>(rec : Record<P>) => {
+    if (!isTagged(record, rec)) {
+        throw new TypeError($msg`Partial expects a record as input, given ${rec}`);
+    }
+    
+    const propsPartial = ObjectUtil.map(rec.props, <Q>(prop : Decoder<Q>) : Decoder<undefined | Q> => {
+        if (isTagged(optional, prop)) {
+            return prop;
+        } else {
+            return optional(prop);
+        }
+    });
+    
     return record(propsPartial);
-    
-    /*
-    const decode = (input : unknown) => {
-        
-    };
-    
-    return {
-        decode: Object.assign(decode, {
-            tag: record,
-            children: MapUtil.map(record.decode.children, prop => optional(prop)),
-        }),
-    };
-    */
 };
 
 
-type DictMeta<E extends Unknown> = {
-    decode : Decoder<RecordOf<E>>['decode'] & Traversable & {
-        tag : typeof dict,
-    },
+export type Dict<E extends Unknown> = Decoder<DictOf<E>> & Traversable & {
+    entry : E,
+    tag : typeof dict,
 };
-export const dict = <E extends Unknown>(entry : E) : Decoder<RecordOf<E>> & DictMeta<E> => {
+export const dictEntry = Symbol('dict.entry');
+export const dict = <E extends Unknown>(entry : E) : Dict<E> => {
+    type Instance = DictOf<E>;
+    
     const decode = (input : unknown) => {
-        type Instance = RecordOf<E>;
-        
         if (typeof input !== 'object' || input === null) {
             return fail(unexpectedTypeError());
         }
@@ -327,25 +319,26 @@ export const dict = <E extends Unknown>(entry : E) : Decoder<RecordOf<E>> & Dict
     };
     
     return {
-        decode: Object.assign(decode, {
-            tag: dict,
-            children: new Map<LocationKey, Unknown>([
-                //[':key', string],
-                [':entry', entry],
-            ]),
-        }),
+        tag: dict,
+        entry,
+        children: new Map<LocationKey, E>([
+            [dictEntry, entry],
+        ]),
+        
+        decode,
     };
 };
 
-type VariantMeta<S extends RecordOf<Unknown>> = {
-    decode : Decoder<MapTypeOf<S>[string]>['decode'] & Traversable & {
-        tag : typeof variant,
-    },
+export type Variant<S extends DictOf<Unknown>> = Decoder<TypeOfDict<S>[string]> & Traversable & {
+    tag : typeof variant,
 };
-export const variant = <S extends RecordOf<Unknown>>(alts : S) : Decoder<MapTypeOf<S>[string]> & VariantMeta<S> => {
+export const variantErrors = {
+    noneValid: (tried : DecodeReportChildren) => ({ type: 'none-valid', tried }),
+};
+export const variant = <S extends DictOf<Unknown>>(alts : S) : Variant<S> => {
+    type Instance = TypeOfDict<S>[string];
+    
     const decode = (input : unknown) => {
-        type Instance = MapTypeOf<S>[string];
-        
         let hasValid = false;
         let instance = null as unknown as Instance;
         const report : DecodeReportChildren = new Map();
@@ -363,16 +356,16 @@ export const variant = <S extends RecordOf<Unknown>>(alts : S) : Decoder<MapType
         }
         
         if (!hasValid) {
-            return fail({ type: 'none-valid', reasons: report });
+            return fail(variantErrors.noneValid(report));
         }
         
         return success(instance);
     };
     
     return {
-        decode: Object.assign(decode, {
-            tag: variant,
-            children: MapUtil.fromObject(alts) as Map<LocationKey, Decoder<unknown>>,
-        }),
+        tag: variant,
+        children: MapUtil.fromObject(alts) as Map<LocationKey, S[string]>,
+        
+        decode,
     };
 };

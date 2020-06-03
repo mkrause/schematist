@@ -1,6 +1,6 @@
 
 // Custom REPL
-// $ npm run --silent build:cjs && node --experimental-repl-await ./src/repl.js
+// $ npm run --silent build:cjs && node ./src/repl.js
 
 const inspect = require('util').inspect;
 const repl = require('repl');
@@ -19,7 +19,7 @@ replServer.setupHistory(`/tmp/schematist_repl-history.txt`, (err, repl) => {});
 
 const D = require('../lib-cjs/modules/Decoding.js');
 const C = require('../lib-cjs/modules/Codec.js');
-const FlattenReporter = require('../lib-cjs/reporters/FlattenReporter.js').default;
+const flatten = require('../lib-cjs/reporters/FlattenReporter.js').default;
 const TextReporter = require('../lib-cjs/reporters/TextReporter.js').default;
 
 const User = D.record({ name: D.string, score: D.number });
@@ -59,10 +59,34 @@ const app2 = D.record({
     })),
 });
 
+const instance2Valid = {
+    users: {
+        alice: {
+            name: 'Alice',
+            lastLogin: null,
+            role: {
+                admin: { zone: 'A' },
+            },
+        },
+    },
+};
+const instance2Invalid = {
+    users: {
+        bob: {
+            //name: 'Bob',
+            lastLogin: undefined,
+            
+            role: {
+                nonexistent: { zone: 'A' },
+            },
+        },
+    },
+};
+
 Object.assign(replServer.context, {
     D,
     C,
-    FlattenReporter,
+    flatten,
     TextReporter,
     
     orThrow: result => {
@@ -80,4 +104,6 @@ Object.assign(replServer.context, {
     instance1Invalid,
     
     app2,
+    instance2Valid,
+    instance2Invalid,
 });
