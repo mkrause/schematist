@@ -35,22 +35,27 @@ export const unexpectedTypeError = <U>() : DecodeError => ({ type: 'unexpected-t
 export type DecodeResult<A> = Either<DecodeReport, A>;
 
 export type Decoder<A> = {
-    decode: (input : unknown) => Either<DecodeReport, A>,
+    decode : (input : unknown) => Either<DecodeReport, A>,
 };
 
-export type TypeOf<D> = D extends Decoder<infer A> ? A : never;
+export type TypeOf<D extends Decoder<unknown>> = D extends Decoder<infer A> ? A : never;
 
 
 //
 // Utilities
 //
 
+export type Tagged<T> = { tag : T };
+export const isTagged = <T>(input : unknown) : input is Tagged<T> => {
+    return typeof input === 'object' && input !== null && ObjectUtil.hasOwnProp(input, 'tag');
+};
+
 type NonEmptyArray<T> = [T, ...Array<T>];
 type Traversable = { children : Map<LocationKey, Decoder<unknown>> };
 
 type Unknown = Decoder<unknown>;
-type RecordOf<T> = Record<PropertyKey, T>;
-type MapTypeOf<T> = { [key in keyof T] : TypeOf<T[key]> };
+type RecordOf<T> = { [key : string] : T };
+type MapTypeOf<T extends { [key : string] : Decoder<unknown> }> = { [key in keyof T] : TypeOf<T[key]> };
 
 
 //
@@ -61,9 +66,8 @@ export const unknown : Decoder<unknown> = {
     decode: (input : unknown) => success(input),
 };
 
-export const neverError = { type: 'never' };
 export const never : Decoder<never> = {
-    decode: (input : unknown) => fail(neverError),
+    decode: (input : unknown) => fail({ type: 'never' }),
 };
 
 export const unit : Decoder<null> = {
@@ -101,21 +105,14 @@ export const boolean : Decoder<boolean> = {
     },
 };
 
-type LiteralMeta<L> = {
-    decode : Decoder<L>['decode'] & {
-        tag : typeof literal,
+export type Literal<L> = Decoder<L> & { tag : typeof literal, literal : L };
+export const literal = <L>(lit : L) : Literal<L> => ({
+    tag: literal,
+    literal: lit,
+    decode: (input : unknown) => {
+        if (input !== lit) { return fail(unexpectedTypeError()); }
+        return success(lit);
     },
-};
-export const literal = <L>(literal : L) : Decoder<L> => ({
-    decode: Object.assign(
-        (input : unknown) => {
-            if (input !== literal) { return fail(unexpectedTypeError()); }
-            return success(input as L);
-        },
-        {
-            tag: literal,
-        },
-    ),
 });
 
 
@@ -123,12 +120,13 @@ export const literal = <L>(literal : L) : Decoder<L> => ({
 // Unions
 //
 
-type UnionMeta<S extends NonEmptyArray<Unknown>> = {
-    decode : Decoder<TypeOf<S[number]>>['decode'] & Traversable & {
-        tag : typeof union,
-    },
+export type Union<S extends NonEmptyArray<Unknown>> = Decoder<TypeOf<S[number]>> & Traversable & {
+    tag : typeof union,
 };
-export const union = <S extends NonEmptyArray<Unknown>>(alts : S) : Decoder<TypeOf<S[number]>> & UnionMeta<S> => {
+const unionErrors = {
+    noneValid: (reasons : DecodeReportChildren) => ({ type: 'none-valid', reasons }),
+};
+export const union = <S extends NonEmptyArray<Unknown>>(alts : S) : Union<S> => {
     const decode = (input : unknown) => {
         type Instance = TypeOf<S[number]>; // `S[number]` is the union of all elements (types) of the array `S`
         
@@ -154,17 +152,16 @@ export const union = <S extends NonEmptyArray<Unknown>>(alts : S) : Decoder<Type
             
             // report.set(selfReport, { given: input, report: { type: 'none-valid' } });
             // return fail(report);
-            return fail({ type: 'none-valid', reasons: report });
+            return fail(unionErrors.noneValid(report));
         }
         
         return success(instance);
     };
     
     return {
-        decode: Object.assign(decode, {
-            tag: union,
-            children: MapUtil.fromArray(alts) as Map<LocationKey, Decoder<unknown>>,
-        }),
+        tag: union,
+        children: MapUtil.fromArray(alts) as Map<LocationKey, Decoder<unknown>>,
+        decode,
     };
 };
 

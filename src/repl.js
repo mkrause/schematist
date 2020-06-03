@@ -18,6 +18,7 @@ replServer.setupHistory(`/tmp/schematist_repl-history.txt`, (err, repl) => {});
 
 
 const D = require('../lib-cjs/modules/Decoding.js');
+const C = require('../lib-cjs/modules/Codec.js');
 const FlattenReporter = require('../lib-cjs/reporters/FlattenReporter.js').default;
 const TextReporter = require('../lib-cjs/reporters/TextReporter.js').default;
 
@@ -60,6 +61,7 @@ const app2 = D.record({
 
 Object.assign(replServer.context, {
     D,
+    C,
     FlattenReporter,
     TextReporter,
     
