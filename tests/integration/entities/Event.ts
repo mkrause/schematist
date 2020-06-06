@@ -5,10 +5,10 @@ import * as D from '../../../src/modules/Decoding.js';
 import * as Entity from '../../../src/modules/Entity.js';
 
 
-const EventT = D.record({
+export const EventT = D.record({
     name: D.string,
 });
-type EventT = D.TypeOf<typeof EventT>;
+export type EventT = D.TypeOf<typeof EventT>;
 
 export interface Event extends EventT {}
 @Entity.staticImplements<D.Decoder<Event>>()

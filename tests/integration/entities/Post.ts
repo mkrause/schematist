@@ -7,16 +7,16 @@ import * as Entity from '../../../src/modules/Entity.js';
 import { User } from './User.js';
 
 
-type PostT = {
-    title : string,
-    author : User,
-};
-const PostT : D.Decoder<PostT> = D.lazy(() => {
-    return D.record({
-        title: D.string,
-        author: User,
-    });
+// export type PostT = {
+//     title : string,
+//     author : User,
+// };
+const Author : D.Decoder<User> = D.lazy(() => User);
+export const PostT /* : D.Decoder<PostT> */ = D.record({
+    title: D.string,
+    author: Author,
 });
+export type PostT = D.TypeOf<typeof PostT>;
 
 export interface Post extends PostT {}
 @Entity.staticImplements<D.Decoder<Post>>()

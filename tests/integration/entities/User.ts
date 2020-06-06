@@ -7,11 +7,11 @@ import * as Entity from '../../../src/modules/Entity.js';
 import { Post } from './Post.js';
 
 
-const UserT = D.record({
+export const UserT = D.record({
     name: D.string,
     posts: D.dict(D.string, Post),
 });
-type UserT = D.TypeOf<typeof UserT>;
+export type UserT = D.TypeOf<typeof UserT>;
 
 export interface User extends UserT {}
 @Entity.staticImplements<D.Decoder<User>>()
