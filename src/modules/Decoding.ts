@@ -4,7 +4,7 @@ import * as ObjectUtil from '../util/ObjectUtil.js';
 import * as MapUtil from '../util/MapUtil.js';
 import { Either } from '../util/Either.js';
 
-import type { LocationKey, Location } from '../modules/Traversing.js';
+import type { LocationKey, Location } from './Traversing.js';
 
 
 //
@@ -55,7 +55,7 @@ type NonEmptyArray<T> = [T, ...Array<T>];
 type Traversable = { children : Map<LocationKey, Decoder<unknown>> };
 
 type Unknown = Decoder<unknown>;
-type DictOf<T> = { [key : string] : T };
+type DictOf<E, K extends string = string> = { [key in K] : E };
 type TypeOfDict<T extends { [key : string] : Decoder<unknown> }> = { [key in keyof T] : TypeOf<T[key]> };
 
 
@@ -274,13 +274,14 @@ export const partial = <P extends DictOf<Unknown>>(rec : Record<P>) => {
 };
 
 
-export type Dict<E extends Unknown> = Decoder<DictOf<E>> & Traversable & {
+export type Dict<E extends Unknown, K extends string = string> = Decoder<DictOf<E, K>> & Traversable & {
     entry : E,
     tag : typeof dict,
 };
+export const dictKey = Symbol('dict.key');
 export const dictEntry = Symbol('dict.entry');
-export const dict = <E extends Unknown>(entry : E) : Dict<E> => {
-    type Instance = DictOf<E>;
+export const dict = <K extends string, E extends Unknown>(key : Decoder<K>, entry : E) : Dict<E, K> => {
+    type Instance = DictOf<E, K>;
     
     const decode = (input : unknown) => {
         if (typeof input !== 'object' || input === null) {
@@ -300,15 +301,24 @@ export const dict = <E extends Unknown>(entry : E) : Dict<E> => {
         }
         
         // Check all entries for validity
-        for (const key in input) {
-            const entryInput = (input as any)[key];
+        for (const inputKey in input) {
+            const entryInput = (input as any)[inputKey];
             
             const entryResult = entry.decode(entryInput);
             
+            const entryKeyResult = key.decode(inputKey);
+            
+            if (Either.isLeft(entryKeyResult)) {
+                // This shouldn't happen, unless the dictionary key violates the `K extends string` restriction
+                throw new TypeError($msg`Given non-string key for ${inputKey}, error: ${entryKeyResult.left}`);
+            }
+            
+            const entryKey = entryKeyResult.right;
+            
             if (Either.isLeft(entryResult)) {
-                report.set(key, { report: entryResult.left });
+                report.set(entryKey, { report: entryResult.left });
             } else {
-                (instance as any)[key] = entryResult.right;
+                (instance as any)[entryKey] = entryResult.right;
             }
         }
         
@@ -323,7 +333,8 @@ export const dict = <E extends Unknown>(entry : E) : Dict<E> => {
         tag: dict,
         entry,
         get children() {
-            return new Map<LocationKey, E>([
+            return new Map<LocationKey, Decoder<K> | E>([
+                [dictKey, key],
                 [dictEntry, entry],
             ]);
         },
@@ -371,4 +382,68 @@ export const variant = <S extends DictOf<Unknown>>(alts : S) : Variant<S> => {
         
         decode,
     };
+};
+
+
+export const lazy = <A>(fn : () => Decoder<A>) : Decoder<A> => {
+    let decoder : undefined | Decoder<A>;
+    
+    // const decode = (input : unknown) => {
+    //     decoder = decoder ?? fn();
+    //     return decoder.decode(input);
+    // };
+    
+    return new Proxy({}, {
+        get(target, prop, receiver) {
+            decoder = decoder ?? fn();
+            return Reflect.get(decoder, prop, receiver);
+        },
+        ownKeys(target) {
+            decoder = decoder ?? fn();
+            return Reflect.ownKeys(decoder);
+        },
+        // TODO: rest of the handler methods
+    }) as Decoder<A>;
+};
+
+
+
+export const locate = <A>(decoder : Decoder<A>, location : Location) : Either<string, Decoder<unknown>> => {
+    if (location.length === 0) {
+        return Either.right(decoder);
+    }
+    
+    if (!isTraversable(decoder)) {
+        return Either.left('Not traversable');
+    }
+    
+    const [head, ...tail] = location;
+    const children = decoder.children;
+    
+    if (!children.has(head)) {
+        return Either.left($msg`No such child ${head}`);
+    }
+    
+    return locate(children.get(head)!, tail);
+};
+
+const isTraversable = <T>(decoder : Decoder<T>) : decoder is Decoder<T> & Traversable => {
+    return ObjectUtil.hasOwnProp(decoder, 'children') && decoder.children instanceof Map;
+};
+
+type Visitor = <A>(decoder : Decoder<A>, location : Location) => void;
+
+const _traverse = <T>(location : Location, decoder : Decoder<T>, visit : Visitor) => {
+    visit(decoder, location);
+    
+    if (isTraversable(decoder)) {
+        const children = decoder.children;
+        for (const [key, child] of children) {
+            _traverse([...location, key], child, visit);
+        }
+    }
+};
+
+export const traverse = <T>(decoder : Decoder<T>, visit : Visitor) => {
+    _traverse([], decoder, visit);
 };

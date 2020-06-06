@@ -22,6 +22,7 @@
         "_build": "babel src --extensions '.js,.ts' --source-maps=true",
         "build:cjs": "NODE_ENV=production BABEL_ENV=cjs npm run _build -- --out-dir lib-cjs --delete-dir-on-start",
         "build:esm": "NODE_ENV=production BABEL_ENV=esm npm run _build -- --out-dir lib-esm --delete-dir-on-start",
+        "build:test": "NODE_ENV=test BABEL_ENV=cjs babel src --extensions '.js,.ts' --source-maps=true --out-dir lib-test/src --delete-dir-on-start && NODE_ENV=test BABEL_ENV=cjs babel tests --extensions '.js,.ts' --source-maps=true --out-dir lib-test/tests --delete-dir-on-start",
         "types": "tsc --project ./tsconfig.decl.json",
         "test:unit": "npm run build:esm && NODE_ENV=development BABEL_ENV=cjs mocha --require=@babel/register --recursive tests/unit",
         "test": "npm run test:unit && tsc && echo '[tsc] success'",
@@ -33,6 +34,7 @@
         "@babel/cli": "^7.10.1",
         "@babel/preset-env": "^7.10.2",
         "@babel/plugin-proposal-class-properties": "^7.10.1",
+        "@babel/plugin-proposal-decorators": "^7.10.1",
         "babel-plugin-transform-builtin-extend": "^1.1.2",
         "@babel/preset-typescript": "^7.10.1",
         "typescript": "^3.9.3",
@@ -42,6 +44,6 @@
         "chai": "^4.2.0"
     },
     "dependencies": {
-        "message-tag": "^0.5.1"
+        "message-tag": "^0.5.2"
     }
 }

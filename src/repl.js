@@ -17,14 +17,17 @@ const replServer = repl.start({
 replServer.setupHistory(`/tmp/schematist_repl-history.txt`, (err, repl) => {});
 
 
+const E = require('../lib-cjs/util/Either.js').Either;
 const D = require('../lib-cjs/modules/Decoding.js');
 const C = require('../lib-cjs/modules/Codec.js');
+const Entity = require('../lib-cjs/modules/Entity.js');
+const R = require('../lib-cjs/modules/Resolving.js');
 const flatten = require('../lib-cjs/reporters/FlattenReporter.js').default;
-const TextReporter = require('../lib-cjs/reporters/TextReporter.js').default;
+const SummaryReporter = require('../lib-cjs/reporters/SummaryReporter.js').default;
 
 const User = D.record({ name: D.string, score: D.number });
 const app1 = D.record({
-    users: D.dict(User),
+    users: D.dict(D.string, User),
 });
 
 const instance1Valid = {
@@ -41,7 +44,7 @@ const instance1Invalid = {
 };
 
 const app2 = D.record({
-    users: D.dict(D.record({
+    users: D.dict(D.string, D.record({
         name: D.string,
         
         lastLogin: D.maybe(D.number),
@@ -55,7 +58,7 @@ const app2 = D.record({
             }),
         }),
         
-        posts: D.dict({ title: D.string }),
+        posts: D.dict(D.string, { title: D.string }),
     })),
 });
 
@@ -73,7 +76,7 @@ const instance2Valid = {
 const instance2Invalid = {
     users: {
         bob: {
-            //name: 'Bob',
+            //name: 'Bob', // Missing
             lastLogin: undefined,
             
             role: {
@@ -83,11 +86,19 @@ const instance2Invalid = {
     },
 };
 
+const app3 = D.record({
+    foo: D.record({ x: D.string }),
+    bar: R.reference(['..', 'foo']),
+});
+
 Object.assign(replServer.context, {
+    E,
     D,
     C,
+    Entity,
+    R,
     flatten,
-    TextReporter,
+    SummaryReporter,
     
     orThrow: result => {
         if (result.left) {
@@ -106,4 +117,6 @@ Object.assign(replServer.context, {
     app2,
     instance2Valid,
     instance2Invalid,
+    
+    app3,
 });

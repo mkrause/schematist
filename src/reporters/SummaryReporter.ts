@@ -34,10 +34,10 @@ const reportAsText = (report : FlattenedReport) : string => {
         .join('\n');
 };
 
-const TextReporter = (report : DecodeReport) : string => {
+const SummaryReporter = (report : DecodeReport) : string => {
     const reportFlattened = flatten(report);
     
     return reportAsText(reportFlattened);
 };
 
-export default TextReporter;
+export default SummaryReporter;

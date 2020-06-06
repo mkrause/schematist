@@ -7,5 +7,6 @@
 # Project
 /lib-cjs/
 /lib-esm/
+/lib-test/
 /typings/*
 !/typings/index.test-d.ts

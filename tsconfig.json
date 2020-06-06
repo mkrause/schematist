@@ -10,6 +10,7 @@
     ],
     "include": [
         "src/**/*",
+        "tests/integration/**/*",
     ],
     "compilerOptions": {
         "noEmit": true,
@@ -23,5 +24,6 @@
         // Note: we don't use TypeScript emit, but we still need to set the target to enable certain language features
         "target": "ES2020",
         "moduleResolution": "node",
+        "experimentalDecorators": true,
     },
 }
