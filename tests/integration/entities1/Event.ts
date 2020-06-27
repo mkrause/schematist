@@ -2,7 +2,7 @@
 import { Either } from '../../../src/util/Either.js';
 
 import * as D from '../../../src/modules/Decoding.js';
-import * as Entity from '../../../src/modules/Entity.js';
+import * as Entity from './Entity.js';
 
 
 export const EventT = D.record({
@@ -17,11 +17,11 @@ export class Event {
         if (typeof input === 'object' && input !== null && input instanceof Event) {
             return Either.right(input as Event);
         }
-        return Either.map(EventT.decode(input), user => new Event(user));
+        return Either.map(EventT.decode(input), event => new Event(event));
     }
     
-    constructor(user : EventT) {
-        Object.assign(this, user);
+    constructor(event : EventT) {
+        Object.assign(this, event);
     }
     
     formatName() {

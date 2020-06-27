@@ -16,6 +16,33 @@ export const staticImplements = <T>() => {
 };
 
 
+const Entity = <A, P, C extends D.Decoder<A> & { new (instance : A) : A }>(decoder : D.Decoder<A>) => {
+    class Entity {
+        static decode(this : C, input : unknown) {
+            if (typeof this !== 'function' || !((this as C).prototype instanceof Entity)) {
+                throw new TypeError($msg`decode() must be called on an Entity class, given ${this}`);
+            }
+            
+            const Self : C = this;
+            
+            if (typeof input === 'object' && input !== null && input instanceof Self) {
+                return Either.right(input as InstanceType<C>);
+            }
+            return Either.map(decoder.decode(input), instance => new Self(instance) as InstanceType<C>);
+        }
+        
+        constructor(instance : A) {
+            Object.assign(this, instance);
+        }
+    }
+    
+    return Entity as unknown as D.Decoder<A & P> & {
+        new (instance : A) : A & P,
+    };
+};
+
+export default Entity;
+
 
 
 // Attempt 1

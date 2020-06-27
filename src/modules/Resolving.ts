@@ -89,6 +89,16 @@ export const resolve = <A>(decoderRoot : D.Decoder<A>) => {
 
 
 
+
+
+
+// type LastStep<T extends [unknown, ...Array<unknown>]> = T extends [...infer A, infer L] ? L : never;
+// const xxx : LastStep<[1, 2, 3]> = 4;
+
+
+
+
+
 // https://www.npmjs.com/package/io-ts-path
 // https://stackoverflow.com/questions/59658536/how-to-write-an-invert-type-in-typescript-to-invert-the-order-of-tuples
 // https://dev.to/miracleblue/how-2-typescript-get-the-last-item-type-from-a-tuple-of-types-3fh3

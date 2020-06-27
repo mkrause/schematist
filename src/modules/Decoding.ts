@@ -111,7 +111,7 @@ export const literal = <L>(lit : L) : Literal<L> => ({
     tag: literal,
     literal: lit,
     decode: (input : unknown) => {
-        if (input !== lit) { return fail(unexpectedTypeError()); }
+        if (!Object.is(input, lit)) { return fail(unexpectedTypeError()); }
         return success(lit);
     },
 });

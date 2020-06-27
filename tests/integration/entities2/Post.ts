@@ -2,7 +2,7 @@
 import { Either } from '../../../src/util/Either.js';
 
 import * as D from '../../../src/modules/Decoding.js';
-import * as Entity from '../../../src/modules/Entity.js';
+import Entity from './Entity.js';
 
 import { User } from './User.js';
 
@@ -19,19 +19,7 @@ export const PostT /* : D.Decoder<PostT> */ = D.record({
 export type PostT = D.TypeOf<typeof PostT>;
 
 export interface Post extends PostT {}
-@Entity.staticImplements<D.Decoder<Post>>()
-export class Post {
-    static decode(input : unknown) /* : Decoder<Post>['decode'] */ {
-        if (typeof input === 'object' && input !== null && input instanceof Post) {
-            return Either.right(input as Post);
-        }
-        return Either.map(PostT.decode(input), post => new Post(post));
-    }
-    
-    constructor(post : PostT) {
-        Object.assign(this, post);
-    }
-    
+export class Post extends Entity(PostT) {
     render() {
         return `title: ${this.title}`;
     }

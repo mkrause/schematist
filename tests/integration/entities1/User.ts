@@ -2,7 +2,7 @@
 import { Either } from '../../../src/util/Either.js';
 
 import * as D from '../../../src/modules/Decoding.js';
-import * as Entity from '../../../src/modules/Entity.js';
+import * as Entity from './Entity.js';
 
 import { Post } from './Post.js';
 
@@ -31,3 +31,10 @@ export class User {
         return `name: ${this.name}`;
     }
 }
+
+const user1 = Either.orThrow(User.decode({
+    name: 'Bob',
+    posts: {},
+}));
+
+const result1 : string = user1.formatName();

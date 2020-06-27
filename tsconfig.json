@@ -7,10 +7,10 @@
         "./src/schematist.ts",
         "./src/index.ts",
         "./src/modules_old/**",
+        "./tests/integration/**/*",
     ],
     "include": [
-        "src/**/*",
-        "tests/integration/**/*",
+        "./src/**/*",
     ],
     "compilerOptions": {
         "noEmit": true,
